@@ -34,6 +34,9 @@
                     <div class="d-flex align-items-center gap-2">
                         <span class="cg-pulse-dot"></span>
                         <span class="fw-bold text-white">{{ default_location }} (CAM-01)</span>
+                        <span id="nodeStatusBadge" class="badge bg-dark border border-warning text-warning ms-2">
+                            <i class="fa-solid fa-power-off me-1"></i> Gate 1 Node: STANDBY
+                        </span>
                     </div>
                     <div class="d-flex gap-2">
                         <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('streamImg').src = '{% url 'surveillance:live_stream' %}?' + new Date().getTime();">
@@ -43,9 +46,9 @@
                 </div>
                 <div class="cg-card-body p-0">
                     <div class="video-stream-container" style="min-height: 460px;">
-                        <img id="streamImg" src="{% url 'surveillance:live_stream' %}" alt="Live Camera Feed" onerror="this.onerror=null; this.src='https://placehold.co/800x450/0b0f19/ef4444?text=Live+CCTV+Feed+Connecting...';" />
-                        <div class="video-overlay-badge">
-                            <span class="cg-pulse-dot green"></span> RTSP/Webcam Stream Active &bull; Sample: 5 FPS
+                        <img id="streamImg" src="{% url 'surveillance:live_stream' %}" alt="Live Camera Feed" onerror="this.onerror=null; this.src='{% url 'surveillance:live_stream' %}';" />
+                        <div class="video-overlay-badge" id="streamOverlayText">
+                            <span class="cg-pulse-dot green"></span> Live CCTV Monitor Active &bull; Gate 1 Stream
                         </div>
                     </div>
                 </div>
@@ -229,5 +232,29 @@ document.getElementById('singleFrameForm').addEventListener('submit', async (e) 
         submitBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass me-1"></i> Run Biometric Analysis';
     }
 });
+
+// Live Heartbeat polling for Authorized Laptop Camera Node
+function pollNodeStatus() {
+    fetch('{% url "surveillance:node_status" %}')
+        .then(res => res.json())
+        .then(data => {
+            const badge = document.getElementById('nodeStatusBadge');
+            const overlay = document.getElementById('streamOverlayText');
+            if (badge) {
+                if (data.online) {
+                    badge.className = 'badge bg-success border border-success-subtle ms-2';
+                    badge.innerHTML = '<i class="fa-solid fa-satellite-dish me-1"></i> Gate 1 Node: STREAMING LIVE';
+                    if (overlay) overlay.innerHTML = '<span class="cg-pulse-dot green"></span> Live Stream Active &bull; Authorized Laptop Camera';
+                } else {
+                    badge.className = 'badge bg-dark border border-warning text-warning ms-2';
+                    badge.innerHTML = '<i class="fa-solid fa-power-off me-1"></i> Gate 1 Node: STANDBY';
+                    if (overlay) overlay.innerHTML = '<span class="cg-pulse-dot"></span> Awaiting Gate 1 Camera Node Link';
+                }
+            }
+        })
+        .catch(err => console.debug('Node status check:', err));
+}
+setInterval(pollNodeStatus, 3000);
+pollNodeStatus();
 </script>
 {% endblock %}

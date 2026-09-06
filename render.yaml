@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: campusguard-ai
+    env: python
+    runtime: python-3.11.9
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn campusguard.wsgi:application --workers 1 --threads 2 --timeout 120"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        value: "*"

@@ -1,0 +1,33 @@
+﻿# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.class
+
+# Local environment and secret files
+.env
+.env.local
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# Staticfiles collected during build
+staticfiles/
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log

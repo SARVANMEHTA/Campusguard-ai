@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Audit Trail - CampusGuard AI{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <h2 class="h3 fw-bold mb-0">System Audit Trail &amp; Detection Logs</h2>
+            <p class="small mb-0 mt-1" style="color: #cbd5e1; font-size: 0.9rem; font-weight: 500;">
+                Complete, immutable log of every biometric detection, match confidence, human verification, and alert
+                dispatch event.
+            </p>
+        </div>
+        <div>
+            <a href="?export=csv{% if status_filter %}&status={{ status_filter }}{% endif %}{% if camera_filter %}&camera={{ camera_filter }}{% endif %}{% if query %}&q={{ query }}{% endif %}"
+                class="btn btn-outline-success btn-sm">
+                <i class="fa-solid fa-file-csv me-1"></i> Export Log (CSV)
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="cg-card mb-4 p-3">
+        <form method="get" class="row g-3 align-items-center">
+            <div class="col-md-4">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-dark border-secondary border-opacity-25 text-muted">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </span>
+                    <input type="text" name="q" value="{{ query }}" class="form-control form-control-sm"
+                        placeholder="Search by student name, roll no, location, or notes...">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+                    <option value="high_confidence" {% if status_filter == 'high_confidence' %}selected{% endif %}>High
+                        Confidence Queue</option>
+                    <option value="low_confidence" {% if status_filter == 'low_confidence' %}selected{% endif %}>Low
+                        Confidence Queue</option>
+                    <option value="verified" {% if status_filter == 'verified' %}selected{% endif %}>Verified (Alert Sent)
+                    </option>
+                    <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected (False
+                        Positive)</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="camera" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="all" {% if camera_filter == 'all' %}selected{% endif %}>All Cameras / Locations
+                    </option>
+                    {% for cam in cameras %}
+                    <option value="{{ cam }}" {% if camera_filter == cam %}selected{% endif %}>{{ cam }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Filter</button>
+                <a href="{% url 'dashboard:detection_logs' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="cg-card">
+        <div class="cg-card-body p-0 table-responsive">
+            <table class="cg-table">
+                <thead>
+                    <tr>
+                        <th>Log ID</th>
+                        <th>CCTV Snapshot</th>
+                        <th>Matched Student</th>
+                        <th>Confidence</th>
+                        <th>Status</th>
+                        <th>Camera &amp; Location</th>
+                        <th>Alert Dispatched</th>
+                        <th>Reviewed By</th>
+                        <th>Timestamp</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td class="font-monospace text-muted small">#DET-{{ log.id }}</td>
+                        <td>
+                            {% if log.snapshot_image %}
+                            <img src="{{ log.snapshot_image.url }}" alt="Snapshot" width="48" height="48"
+                                style="border-radius: 6px; object-fit: cover; border: 1px solid #334155;">
+                            {% else %}
+                            <span class="text-muted small">No Img</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if log.matched_student %}
+                            <div class="fw-bold text-white">{{ log.matched_student.full_name }}</div>
+                            <small class="text-danger font-monospace">{{ log.matched_student.student_id }}</small>
+                            {% else %}
+                            <span class="text-muted">Unidentified Face</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span
+                                class="badge {% if log.confidence_percentage >= 70 %}badge-high{% elif log.confidence_percentage >= 65 %}badge-low{% else %}bg-secondary{% endif %}">
+                                {{ log.confidence_percentage }}%
+                            </span>
+                        </td>
+                        <td>
+                            <span
+                                class="badge {% if log.status == 'verified' %}badge-verified{% elif log.status == 'rejected' %}badge-rejected{% elif log.status == 'high_confidence' %}badge-high{% else %}badge-low{% endif %}">
+                                {{ log.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="small fw-semibold">{{ log.location }}</div>
+                            <small class="text-muted">{{ log.camera_id }}</small>
+                        </td>
+                        <td>
+                            {% if log.alert_sent %}
+                            <span class="text-success small fw-bold">
+                                <i class="fa-solid fa-circle-check me-1"></i> Sent ({{ log.alert_sent_at|date:"H:i" }})
+                            </span>
+                            {% else %}
+                            <span class="badge bg-dark border border-secondary border-opacity-50" style="color: #94a3b8; font-weight: 500;">Not Sent</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if log.admin_reviewed_by %}
+                            <span class="small text-light">{{ log.admin_reviewed_by.username }}</span>
+                            {% else %}
+                            <span class="small font-monospace" style="color: #93c5fd; font-weight: 500;"><i class="fa-solid fa-robot me-1"></i>Automated Route</span>
+                            {% endif %}
+                        </td>
+                        <td class="small font-monospace" style="color: #e2e8f0; font-weight: 500;">{{ log.timestamp|date:"d M Y, H:i:s" }}</td>
+                        <td>
+                            <a href="{% url 'dashboard:detection_detail' log.id %}" class="btn btn-sm btn-outline-info">
+                                <i class="fa-solid fa-circle-info"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="text-center py-5 text-muted">
+                            No detection records found matching criteria.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Suspended Students Directory - CampusGuard AI{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <h2 class="h3 fw-bold mb-0">Suspended Students Directory</h2>
+            <p class="small mb-0 mt-1" style="color: #cbd5e1; font-weight: 400; font-size: 0.92rem;">
+                Active watch list of students barred from campus premises with registered biometric facial vectors.
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'students:student_create' %}" class="btn btn-danger">
+                <i class="fa-solid fa-user-plus me-1"></i> Register Suspended Student
+            </a>
+        </div>
+    </div>
+
+    <!-- Search & Filter Bar -->
+    <div class="cg-card mb-4 p-3">
+        <form method="get" class="row g-3 align-items-center">
+            <div class="col-md-5">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-dark border-secondary border-opacity-25 text-muted">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </span>
+                    <input type="text" name="q" value="{{ query }}" class="form-control form-control-sm" placeholder="Search by name, roll number, department, or reason...">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Suspensions Only</option>
+                    <option value="expired" {% if status_filter == 'expired' %}selected{% endif %}>Expired Suspensions</option>
+                </select>
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Filter</button>
+                <a href="{% url 'students:student_list' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Student Cards Grid -->
+    <div class="row g-4">
+        {% for student in students %}
+            <div class="col-md-6 col-xl-4">
+                <div class="cg-card h-100 position-relative">
+                    <div class="cg-card-body">
+                        <div class="d-flex gap-3 align-items-start mb-3">
+                            {% if student.photo %}
+                                <img src="{{ student.photo.url }}" alt="{{ student.full_name }}" style="width: 72px; height: 72px; border-radius: 10px; object-fit: cover; border: 2px solid #334155;">
+                            {% else %}
+                                <div class="bg-secondary text-center rounded d-flex align-items-center justify-content-center" style="width: 72px; height: 72px;">
+                                    <i class="fa-solid fa-user text-muted" style="font-size: 1rem;"></i>
+                                </div>
+                            {% endif %}
+                            
+                            <div class="flex-grow-1">
+                                <h5 class="fw-bold text-white mb-1">{{ student.full_name }}</h5>
+                                <div class="font-monospace text-light small fw-bold mb-1">{{ student.student_id }}</div>
+                                <div>
+                                    {% if student.status == 'active' %}
+                                        <span class="badge bg-danger">ACTIVE SUSPENSION</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">EXPIRED</span>
+                                    {% endif %}
+                                    <span class="badge bg-dark border border-secondary border-opacity-50 text-muted ms-1">
+                                        {{ student.embeddings.count }} vector(s)
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="small mb-2" style="color: #cbd5e1; font-weight: 500;">
+                            <i class="fa-solid fa-graduation-cap me-1 text-info"></i> <strong class="text-white">{{ student.department }}</strong> &bull; {{ student.year }}
+                        </div>
+                        
+                        <div class="p-2 bg-dark rounded small border border-secondary border-opacity-25 mb-3">
+                            <div class="text-secondary fw-semibold">Suspension Period:</div>
+                            <div class="text-white">{{ student.suspension_start_date|date:"d M Y" }} &rarr; {{ student.suspension_end_date|date:"d M Y" }}</div>
+                        </div>
+
+                        <p class="small mb-3" style="color: #e2e8f0; min-height: 40px; line-height: 1.5;">
+                            <strong class="text-warning">Reason:</strong> {{ student.suspension_reason|truncatechars:90 }}
+                        </p>
+
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top border-secondary border-opacity-25">
+                            <a href="{% url 'students:student_detail' student.id %}" class="btn btn-sm btn-outline-info">
+                                <i class="fa-solid fa-id-card me-1"></i> Full Profile
+                            </a>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'students:student_update' student.id %}" class="btn btn-outline-secondary" title="Edit Student">
+                                    <i class="fa-solid fa-pen"></i>
+                                </a>
+                                <a href="{% url 'students:student_toggle_status' student.id %}" class="btn btn-outline-warning" title="Toggle Status">
+                                    <i class="fa-solid fa-power-off"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <div class="cg-card text-center py-5">
+                    <div class="cg-card-body">
+                        <i class="fa-solid fa-user-slash text-muted display-4 mb-3"></i>
+                        <h5 class="fw-bold text-white">No Suspended Students Found</h5>
+                        <p class="text-muted">No student records match your query or database is currently empty.</p>
+                        <a href="{% url 'students:student_create' %}" class="btn btn-danger btn-sm">
+                            <i class="fa-solid fa-user-plus me-1"></i> Register Student Now
+                        </a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}

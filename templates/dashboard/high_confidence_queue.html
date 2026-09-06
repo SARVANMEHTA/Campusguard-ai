@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}High-Confidence Detections - CampusGuard AI{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+
+    <!-- Page Header & Filtering Tabs -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="cg-pulse-dot"></span>
+                <h2 class="h3 fw-bold mb-0 text-danger">High-Confidence Detections (&gt;70%)</h2>
+            </div>
+            <p class="small mb-0 mt-1" style="color: #cbd5e1; font-weight: 400; font-size: 0.92rem;">
+                Unique suspended persons detected on campus premises. Instant security alerts are dispatched automatically upon detection.
+            </p>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <!-- Filter Tabs -->
+            <div class="btn-group btn-group-sm me-2" role="group">
+                <a href="{% url 'dashboard:high_confidence_queue' %}" 
+                   class="btn {% if not show_all %}btn-danger fw-bold{% else %}btn-outline-secondary{% endif %}">
+                    <i class="fa-solid fa-bell me-1"></i> Active 
+                    {% if active_count > 0 %}<span class="badge bg-white text-danger ms-1">{{ active_count }}</span>{% endif %}
+                </a>
+                <a href="{% url 'dashboard:high_confidence_queue' %}?show=all" 
+                   class="btn {% if show_all %}btn-danger fw-bold{% else %}btn-outline-secondary{% endif %}">
+                    <i class="fa-solid fa-list-check me-1"></i> All History
+                </a>
+            </div>
+
+            <a href="{% url 'dashboard:overview' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> Back to Overview
+            </a>
+            <button onclick="window.location.reload()" class="btn btn-sm btn-outline-light">
+                <i class="fa-solid fa-rotate me-1"></i> Refresh List
+            </button>
+        </div>
+    </div>
+
+    <!-- Content View List (Windows Explorer Inspired) -->
+    {% if detections %}
+    <div class="cg-content-view-container">
+        {% for log in detections %}
+        <div class="cg-content-row {% if log.status == 'acknowledged' %}acknowledged{% endif %} d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+            
+            <!-- Left: Dual Photos (Official + Gate Capture) -->
+            <div class="cg-content-thumb-container">
+                <div class="cg-content-thumb-box" title="Official Reference Photo">
+                    {% if log.matched_student.photo %}
+                    <img src="{{ log.matched_student.photo.url }}" alt="Official Reference">
+                    {% else %}
+                    <div class="w-100 h-100 d-flex align-items-center justify-content-center text-muted small">No Img</div>
+                    {% endif %}
+                    <span class="cg-thumb-tag">Official</span>
+                </div>
+                <div class="cg-content-thumb-box capture-box" title="Surveillance Gate Capture">
+                    {% if log.snapshot_image %}
+                    <img src="{{ log.snapshot_image.url }}" alt="Gate Capture">
+                    {% else %}
+                    <div class="w-100 h-100 d-flex align-items-center justify-content-center text-danger small">No Snap</div>
+                    {% endif %}
+                    <span class="cg-thumb-tag capture-tag">Capture</span>
+                </div>
+            </div>
+
+            <!-- Middle: Person Details (Line 1: Name + Badges | Line 2: Details) -->
+            <div class="flex-grow-1 min-w-0">
+                <!-- Line 1: Person Name, Match %, Alert Dispatched Automatically -->
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                    <h5 class="cg-content-title mb-0">{{ log.matched_student.full_name }}</h5>
+                    <span class="badge badge-high py-1 px-2">
+                        <i class="fa-solid fa-bullseye me-1"></i>{{ log.confidence_percentage }}% Match
+                    </span>
+                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 py-1 px-2">
+                        <i class="fa-solid fa-circle-check me-1"></i> Alert Dispatched Automatically
+                    </span>
+                    {% if log.status == 'acknowledged' %}
+                    <span class="badge bg-secondary py-1 px-2">
+                        <i class="fa-solid fa-check-double me-1"></i> Acknowledged
+                    </span>
+                    {% endif %}
+                </div>
+
+                <!-- Line 2: Metadata (ID, Dept, Location, Reason) -->
+                <div class="cg-content-meta-line d-flex flex-wrap align-items-center gap-2">
+                    <span>
+                        <span class="cg-content-meta-label">Roll No:</span>
+                        <span class="font-monospace text-light fw-bold">{{ log.matched_student.student_id }}</span>
+                    </span>
+                    <span class="text-muted">&bull;</span>
+                    <span>
+                        <span class="cg-content-meta-label">Dept:</span>
+                        <span class="cg-content-meta-val">{{ log.matched_student.department }} ({{ log.matched_student.year }})</span>
+                    </span>
+                    <span class="text-muted">&bull;</span>
+                    <span>
+                        <span class="cg-content-meta-label">Location:</span>
+                        <i class="fa-solid fa-location-dot text-danger me-1"></i>
+                        <span class="cg-content-meta-val">{{ log.location }} ({{ log.camera_id }})</span>
+                    </span>
+                    {% if log.matched_student.suspension_reason %}
+                    <span class="text-muted">&bull;</span>
+                    <span>
+                        <span class="cg-content-meta-label">Reason:</span>
+                        <span class="text-warning-emphasis">{{ log.matched_student.suspension_reason|truncatechars:40 }}</span>
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Right: Timestamp & Action Buttons -->
+            <div class="d-flex flex-column align-items-start align-items-md-end justify-content-center gap-2 flex-shrink-0">
+                <!-- Date / Time -->
+                <div class="text-muted small text-md-end">
+                    <div>
+                        <span class="cg-content-meta-label">Date detected:</span>
+                        <strong class="text-light">{{ log.timestamp|date:"d-m-Y H:i" }}</strong>
+                    </div>
+                    <div class="text-muted" style="font-size: 0.78rem;">
+                        <i class="fa-solid fa-clock me-1"></i>{{ log.timestamp|timesince }} ago
+                    </div>
+                </div>
+
+                <!-- Buttons: Audit Details & OK Button -->
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <a href="{% url 'dashboard:detection_detail' log.id %}" class="btn btn-outline-light btn-sm py-1 px-2" title="Audit Evidence & Logs">
+                        <i class="fa-solid fa-file-shield me-1"></i> Audit Details
+                    </a>
+
+                    {% if log.status != 'acknowledged' %}
+                    <form method="post" action="{% url 'dashboard:acknowledge_detection' log.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="btn btn-success btn-sm py-1 px-3 fw-bold shadow-sm" title="Acknowledge detection and mark as OK">
+                            <i class="fa-solid fa-check me-1"></i> OK
+                        </button>
+                    </form>
+                    {% else %}
+                    <span class="badge bg-secondary py-1 px-2 text-muted">
+                        <i class="fa-solid fa-check-double me-1"></i> OK
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="cg-card text-center py-5">
+        <div class="cg-card-body">
+            <i class="fa-solid fa-circle-check text-success display-3 mb-3"></i>
+            <h4 class="fw-bold text-white">
+                {% if show_all %}
+                No High-Confidence Records Found
+                {% else %}
+                No Active High-Confidence Detections
+                {% endif %}
+            </h4>
+            <p class="text-muted max-w-md mx-auto">
+                {% if show_all %}
+                No high-confidence match logs have been recorded yet.
+                {% else %}
+                All detected suspended persons have been acknowledged or no high-confidence alerts are currently pending.
+                {% endif %}
+            </p>
+            <div class="d-flex justify-content-center gap-2 mt-3">
+                {% if not show_all %}
+                <a href="{% url 'dashboard:high_confidence_queue' %}?show=all" class="btn btn-outline-secondary btn-sm">
+                    <i class="fa-solid fa-list-check me-1"></i> View All History
+                </a>
+                {% endif %}
+                <a href="{% url 'surveillance:live_monitor' %}" class="btn btn-outline-primary btn-sm">
+                    <i class="fa-solid fa-video me-1"></i> Watch Live Surveillance Feed
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

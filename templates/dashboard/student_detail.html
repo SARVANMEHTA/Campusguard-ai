@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ student.full_name }} - Profile &amp; Embeddings{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <h2 class="h3 fw-bold mb-0">{{ student.full_name }}</h2>
+            <p class="text-muted small mb-0 mt-1">Roll Number: <span class="font-monospace text-light fw-bold">{{ student.student_id }}</span></p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'students:student_list' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> Roster
+            </a>
+            <a href="{% url 'students:student_update' student.id %}" class="btn btn-outline-primary btn-sm">
+                <i class="fa-solid fa-pen me-1"></i> Edit
+            </a>
+            <a href="{% url 'students:student_toggle_status' student.id %}" class="btn btn-outline-warning btn-sm">
+                <i class="fa-solid fa-power-off me-1"></i> Toggle Active/Expired
+            </a>
+            <form method="post" action="{% url 'students:student_delete' student.id %}" style="display:inline;" onsubmit="return confirm('Are you sure you want to completely delete this student record?');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                    <i class="fa-solid fa-trash me-1"></i> Delete
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <!-- Student Info Card -->
+        <div class="col-lg-4">
+            <div class="cg-card h-100">
+                <div class="cg-card-body text-center">
+                    {% if student.photo %}
+                        <img src="{{ student.photo.url }}" alt="{{ student.full_name }}" style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 3px solid #ef4444; margin-bottom: 15px;">
+                    {% else %}
+                        <div class="bg-secondary text-center rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 150px; height: 150px;">
+                            <i class="fa-solid fa-user text-muted" style="font-size: 1.2rem;"></i>
+                        </div>
+                    {% endif %}
+
+                    <h4 class="fw-bold text-white mb-1">{{ student.full_name }}</h4>
+                    <div class="font-monospace text-danger fw-bold mb-2">{{ student.student_id }}</div>
+
+                    <div>
+                        {% if student.status == 'active' %}
+                            <span class="badge bg-danger px-3 py-2">ACTIVE SUSPENSION</span>
+                        {% else %}
+                            <span class="badge bg-secondary px-3 py-2">EXPIRED SUSPENSION</span>
+                        {% endif %}
+                    </div>
+
+                    <hr class="border-secondary border-opacity-25 my-3">
+
+                    <div class="text-start small">
+                        <div class="mb-2"><strong>Department:</strong> <span class="text-light">{{ student.department }}</span></div>
+                        <div class="mb-2"><strong>Academic Year:</strong> <span class="text-light">{{ student.year }}</span></div>
+                        <div class="mb-2"><strong>Suspension Start:</strong> <span class="text-light">{{ student.suspension_start_date|date:"d M Y" }}</span></div>
+                        <div class="mb-2"><strong>Suspension End:</strong> <span class="text-light">{{ student.suspension_end_date|date:"d M Y" }}</span></div>
+                        <div class="mb-2"><strong>Registered On:</strong> <span class="text-muted">{{ student.created_at|date:"d M Y, H:i" }}</span></div>
+                    </div>
+
+                    <div class="p-3 bg-dark rounded border border-danger border-opacity-25 text-start mt-3">
+                        <div class="fw-bold text-danger small mb-1">Disciplinary Reason:</div>
+                        <div class="small text-muted">{{ student.suspension_reason }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enrolled Face Embeddings Gallery & Detection History -->
+        <div class="col-lg-8">
+            <!-- Embeddings Gallery -->
+            <div class="cg-card mb-4">
+                <div class="cg-card-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-fingerprint text-info"></i>
+                        <span>Enrolled Face Embedding Vectors ({{ embeddings.count }})</span>
+                    </div>
+                    <button class="btn btn-sm btn-outline-info" data-bs-toggle="collapse" data-bs-target="#addAngleCollapse">
+                        <i class="fa-solid fa-plus me-1"></i> Add Angle Photo
+                    </button>
+                </div>
+                <div class="cg-card-body">
+                    <!-- Collapsible Add Angle Photo Form -->
+                    <div class="collapse mb-3" id="addAngleCollapse">
+                        <div class="p-3 bg-dark rounded border border-info border-opacity-25">
+                            <form method="post" action="{% url 'students:add_embedding' student.id %}" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-sm-8">
+                                        <input type="file" name="photo" class="form-control form-control-sm" accept="image/*" required>
+                                    </div>
+                                    <div class="col-sm-4">
+                                        <button type="submit" class="btn btn-info btn-sm w-100 fw-bold">Upload &amp; Extract</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        {% for emb in embeddings %}
+                            <div class="col-sm-4">
+                                <div class="p-2 bg-dark rounded border border-secondary border-opacity-25 text-center">
+                                    {% if emb.source_image %}
+                                        <img src="{{ emb.source_image.url }}" alt="Angle Crop" style="width: 100%; height: 110px; object-fit: cover; border-radius: 6px;">
+                                    {% else %}
+                                        <div class="bg-secondary py-4 text-muted small">Cropped Vector</div>
+                                    {% endif %}
+                                    <div class="small fw-bold text-light mt-2">Vector #{{ emb.id }}</div>
+                                    <div class="text-muted" style="font-size: 0.75rem;">{{ emb.model_version }} &bull; 128-d</div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <div class="col-12 text-muted small py-3">No embeddings extracted yet.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Historical Detections Log for this Student -->
+            <div class="cg-card">
+                <div class="cg-card-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-camera-viewfinder text-danger"></i>
+                        <span>Detection Incident History ({{ detections.count }})</span>
+                    </div>
+                </div>
+                <div class="cg-card-body p-0 table-responsive">
+                    <table class="cg-table">
+                        <thead>
+                            <tr>
+                                <th>Snapshot</th>
+                                <th>Confidence</th>
+                                <th>Status</th>
+                                <th>Location</th>
+                                <th>Timestamp</th>
+                                <th>Alert Sent</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for det in detections %}
+                                <tr>
+                                    <td>
+                                        {% if det.snapshot_image %}
+                                            <img src="{{ det.snapshot_image.url }}" alt="Snapshot" width="40" height="40" style="border-radius: 4px; object-fit: cover;">
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if det.confidence_percentage >= 70 %}badge-high{% else %}badge-low{% endif %}">
+                                            {{ det.confidence_percentage }}%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if det.status == 'verified' %}badge-verified{% elif det.status == 'rejected' %}badge-rejected{% else %}bg-secondary{% endif %}">
+                                            {{ det.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td class="small">{{ det.location }}</td>
+                                    <td class="small text-muted">{{ det.timestamp|date:"d M Y, H:i" }}</td>
+                                    <td>
+                                        {% if det.alert_sent %}
+                                            <span class="text-success small fw-bold"><i class="fa-solid fa-check me-1"></i> Yes</span>
+                                        {% else %}
+                                            <span class="text-muted small">No</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted small">No detection events recorded for this student.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

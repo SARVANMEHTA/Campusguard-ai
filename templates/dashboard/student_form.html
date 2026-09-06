@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - CampusGuard AI{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0" style="max-width: 850px;">
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h2 class="h3 fw-bold mb-0 text-white">{{ title }}</h2>
+            <p class="text-muted small mb-0 mt-1">
+                Enter student details and upload reference portrait photos for deep face biometric extraction.
+            </p>
+        </div>
+        <a href="{% url 'students:student_list' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left me-1"></i> Back to Roster
+        </a>
+    </div>
+
+    <div class="cg-card">
+        <div class="cg-card-header">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-user-shield text-danger"></i>
+                <span>Student Biometric &amp; Suspension Profile</span>
+            </div>
+        </div>
+        <div class="cg-card-body">
+            <form method="post" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for err in form.non_field_errors %}
+                            <div><i class="fa-solid fa-circle-exclamation me-1"></i> {{ err }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-light fw-semibold">Student ID / Roll Number *</label>
+                        {{ form.student_id }}
+                        {% if form.student_id.errors %}
+                            <div class="text-danger small mt-1">{{ form.student_id.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label text-light fw-semibold">Full Name *</label>
+                        {{ form.full_name }}
+                        {% if form.full_name.errors %}
+                            <div class="text-danger small mt-1">{{ form.full_name.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-light fw-semibold">Department *</label>
+                        {{ form.department }}
+                        {% if form.department.errors %}
+                            <div class="text-danger small mt-1">{{ form.department.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label text-light fw-semibold">Academic Year / Semester *</label>
+                        {{ form.year }}
+                        {% if form.year.errors %}
+                            <div class="text-danger small mt-1">{{ form.year.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-light fw-semibold">Suspension Start Date *</label>
+                        {{ form.suspension_start_date }}
+                        {% if form.suspension_start_date.errors %}
+                            <div class="text-danger small mt-1">{{ form.suspension_start_date.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label text-light fw-semibold">Suspension End Date *</label>
+                        {{ form.suspension_end_date }}
+                        {% if form.suspension_end_date.errors %}
+                            <div class="text-danger small mt-1">{{ form.suspension_end_date.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-light fw-semibold">Suspension Status *</label>
+                    {{ form.status }}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-light fw-semibold">Reason for Suspension *</label>
+                    {{ form.suspension_reason }}
+                    {% if form.suspension_reason.errors %}
+                        <div class="text-danger small mt-1">{{ form.suspension_reason.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="p-3 bg-dark rounded border border-secondary border-opacity-25 mb-4">
+                    <h6 class="fw-bold text-info mb-2"><i class="fa-solid fa-camera-retro me-1"></i> Biometric Enrollment Photos</h6>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-light small fw-semibold">Primary Reference Photo (Frontal, well-lit) *</label>
+                        {{ form.photo }}
+                        {% if form.photo.errors %}
+                            <div class="text-danger small mt-1">{{ form.photo.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label text-light small fw-semibold">Additional Angle Photos (Multi-view registration)</label>
+                        {{ form.additional_photos }}
+                        <div class="form-text text-muted">Upload 1-3 additional angles to boost recognition accuracy across different lighting conditions.</div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{% url 'students:student_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-danger px-4 fw-bold">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> Save &amp; Generate Biometric Embeddings
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

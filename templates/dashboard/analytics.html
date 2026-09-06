@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Analytics &amp; Intelligence - CampusGuard AI{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <h2 class="h3 fw-bold mb-0">Analytics &amp; Biometric Intelligence</h2>
+            <p class="text-muted small mb-0 mt-1">
+                Visual insights on campus perimeter breach attempts, gate hotspot distributions, and recognition precision.
+            </p>
+        </div>
+        <div>
+            <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-print me-1"></i> Print Summary
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick Stats Summary -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-xl-3">
+            <div class="cg-card p-3">
+                <div class="text-muted small text-uppercase fw-bold">Total Detections Logged</div>
+                <div class="fs-2 fw-bold text-white mt-1">{{ total_detections }}</div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="cg-card p-3 border-success">
+                <div class="text-success small text-uppercase fw-bold">Verified Incidents (Alerts Sent)</div>
+                <div class="fs-2 fw-bold text-success mt-1">{{ verified_count }}</div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="cg-card p-3 border-secondary">
+                <div class="text-muted small text-uppercase fw-bold">False Positives Filtered</div>
+                <div class="fs-2 fw-bold text-secondary mt-1">{{ rejected_count }}</div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="cg-card p-3 border-danger">
+                <div class="text-danger small text-uppercase fw-bold">Pending Review Queue</div>
+                <div class="fs-2 fw-bold text-danger mt-1">{{ nav_total_pending }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row g-4 mb-4">
+        <!-- Verification Resolution Pie Chart -->
+        <div class="col-lg-6">
+            <div class="cg-card h-100">
+                <div class="cg-card-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-info"></i>
+                        <span>Detection Resolution Breakdown</span>
+                    </div>
+                </div>
+                <div class="cg-card-body d-flex align-items-center justify-content-center" style="min-height: 320px;">
+                    <canvas id="resolutionChart" style="max-height: 280px;"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gate Location Hotspot Distribution Bar Chart -->
+        <div class="col-lg-6">
+            <div class="cg-card h-100">
+                <div class="cg-card-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-chart-simple text-danger"></i>
+                        <span>Campus Gate Detection Hotspots</span>
+                    </div>
+                </div>
+                <div class="cg-card-body d-flex align-items-center justify-content-center" style="min-height: 320px;">
+                    <canvas id="gateChart" style="max-height: 280px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gate Hotspots Table -->
+    <div class="cg-card">
+        <div class="cg-card-header">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-map-pin text-warning"></i>
+                <span>Perimeter Gate Activity Summary</span>
+            </div>
+        </div>
+        <div class="cg-card-body p-0 table-responsive">
+            <table class="cg-table">
+                <thead>
+                    <tr>
+                        <th>Gate / Camera Location</th>
+                        <th>Total Sightings</th>
+                        <th>Risk Level</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for gate in gate_stats %}
+                        <tr>
+                            <td class="fw-bold text-white">{{ gate.location }}</td>
+                            <td><span class="badge bg-danger rounded-pill px-3">{{ gate.count }} detections</span></td>
+                            <td>
+                                {% if gate.count > 5 %}
+                                    <span class="text-danger fw-bold"><i class="fa-solid fa-triangle-exclamation me-1"></i> High Activity</span>
+                                {% else %}
+                                    <span class="text-warning fw-semibold"><i class="fa-solid fa-shield me-1"></i> Moderate</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="badge bg-success">Camera Monitored</span></td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center py-4 text-muted">No gate detection statistics available.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Resolution Donut Chart
+    const ctxRes = document.getElementById('resolutionChart').getContext('2d');
+    new Chart(ctxRes, {
+        type: 'doughnut',
+        data: {
+            labels: ['Verified Match (Alert Sent)', 'Rejected (False Positive)', 'High Conf Pending', 'Low Conf Pending'],
+            datasets: [{
+                data: [{{ verified_count }}, {{ rejected_count }}, {{ high_conf_count }}, {{ low_conf_count }}],
+                backgroundColor: ['#10b981', '#64748b', '#ef4444', '#f97316'],
+                borderColor: '#131b2e',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#94a3b8', font: { family: 'Inter' } } }
+            }
+        }
+    });
+
+    // 2. Gate Hotspots Bar Chart
+    const ctxGate = document.getElementById('gateChart').getContext('2d');
+    const gateLabels = [{% for g in gate_stats %}'{{ g.location }}',{% endfor %}];
+    const gateData = [{% for g in gate_stats %}{{ g.count }},{% endfor %}];
+
+    new Chart(ctxGate, {
+        type: 'bar',
+        data: {
+            labels: gateLabels.length > 0 ? gateLabels : ['Main Gate', 'North Gate', 'Hostel Gate', 'Library Entry'],
+            datasets: [{
+                label: 'Detections Recorded',
+                data: gateData.length > 0 ? gateData : [12, 5, 8, 3],
+                backgroundColor: '#3b82f6',
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

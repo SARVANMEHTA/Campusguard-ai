@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Live Gate Surveillance - CampusGuard AI{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="cg-pulse-dot green"></span>
+                <h2 class="h3 fw-bold mb-0 text-white">Live Gate Surveillance Console</h2>
+            </div>
+            <p class="small mb-0 mt-1" style="color: #cbd5e1; font-weight: 400; font-size: 0.92rem;">
+                Real-time video ingest &bull; Continuous face detection &bull; Vectorized cosine similarity matching.
+            </p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <span class="badge bg-dark border border-secondary border-opacity-50 py-2 px-3 text-light">
+                <i class="fa-solid fa-database text-info me-1"></i> {{ active_students_count }} Active Embeddings Indexed
+            </span>
+            <a href="{% url 'dashboard:high_confidence_queue' %}" class="btn btn-danger btn-sm">
+                <i class="fa-solid fa-bell me-1"></i> Review Queue
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <!-- Live Video Stream -->
+        <div class="col-xl-8">
+            <div class="cg-card">
+                <div class="cg-card-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="cg-pulse-dot"></span>
+                        <span class="fw-bold text-white">{{ default_location }} (CAM-01)</span>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('streamImg').src = '{% url 'surveillance:live_stream' %}?' + new Date().getTime();">
+                            <i class="fa-solid fa-rotate me-1"></i> Reconnect
+                        </button>
+                    </div>
+                </div>
+                <div class="cg-card-body p-0">
+                    <div class="video-stream-container" style="min-height: 460px;">
+                        <img id="streamImg" src="{% url 'surveillance:live_stream' %}" alt="Live Camera Feed" onerror="this.onerror=null; this.src='https://placehold.co/800x450/0b0f19/ef4444?text=Live+CCTV+Feed+Connecting...';" />
+                        <div class="video-overlay-badge">
+                            <span class="cg-pulse-dot green"></span> RTSP/Webcam Stream Active &bull; Sample: 5 FPS
+                        </div>
+                    </div>
+                </div>
+                <div class="p-3 bg-dark border-top border-secondary border-opacity-25 d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div class="d-flex align-items-center gap-3 small">
+                        <span class="text-danger fw-semibold"><i class="fa-solid fa-square me-1"></i> Red: High Conf (&gt;70%)</span>
+                        <span class="text-warning fw-semibold"><i class="fa-solid fa-square me-1"></i> Orange: Low Conf (65-70%)</span>
+                        <span class="text-success fw-semibold"><i class="fa-solid fa-square me-1"></i> Green: Verified Non-Suspended</span>
+                    </div>
+                    <span class="small" style="color: #94a3b8;">Auto-deduplication cooldown: 3 min</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Frame Inspection / Test Upload Simulator -->
+        <div class="col-xl-4">
+            <div class="cg-card mb-4">
+                <div class="cg-card-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-upload text-info"></i>
+                        <span class="fw-semibold text-white">Manual Frame Inspection</span>
+                    </div>
+                </div>
+                <div class="cg-card-body">
+                    <p class="small mb-3" style="color: #cbd5e1; line-height: 1.5;">
+                        Test the recognition engine by uploading a CCTV photo or gate capture to run immediate biometric matching against all active suspended students.
+                    </p>
+
+                    <form id="singleFrameForm" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold" style="color: #cbd5e1;">Upload Gate Snapshot Image</label>
+                            <input type="file" id="testImageInput" name="image" class="form-control form-control-sm" accept="image/*" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold" style="color: #cbd5e1;">Inspection Location</label>
+                            <input type="text" name="location" class="form-control form-control-sm" value="Gate 1 - Manual Inspection">
+                        </div>
+                        <button type="submit" class="btn btn-outline-info btn-sm w-100 fw-bold" id="btnTestSubmit">
+                            <i class="fa-solid fa-magnifying-glass me-1"></i> Run Biometric Analysis
+                        </button>
+                    </form>
+
+                    <!-- Test Output Container -->
+                    <div id="testResultBox" class="mt-3 p-3 bg-dark rounded border border-secondary border-opacity-25 d-none">
+                        <h6 class="small fw-bold text-light mb-2">Analysis Results:</h6>
+                        <div id="testResultContent" class="small" style="color: #cbd5e1;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terminal CLI Reference Card -->
+            <div class="cg-card">
+                <div class="cg-card-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-terminal text-success"></i>
+                        <span class="fw-semibold text-white">CLI Daemon Surveillance</span>
+                    </div>
+                </div>
+                <div class="cg-card-body">
+                    <p class="small mb-2" style="color: #cbd5e1;">To run the standalone background CV engine across gate CCTV cameras:</p>
+                    <div class="bg-black p-2 rounded text-success small font-monospace mb-2 border border-secondary border-opacity-25">
+                        python manage.py run_surveillance --camera 0 --location "Main Gate"
+                    </div>
+                    <div class="bg-black p-2 rounded text-success small font-monospace border border-secondary border-opacity-25">
+                        python manage.py run_surveillance --camera rtsp://... --headless
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Recent Sightings Table -->
+    <div class="cg-card">
+        <div class="cg-card-header">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-clock-rotate-left text-warning"></i>
+                <span class="fw-semibold text-white">Live Stream Sightings Log</span>
+            </div>
+            <a href="{% url 'dashboard:detection_logs' %}" class="btn btn-sm btn-outline-secondary">Full Audit Trail</a>
+        </div>
+        <div class="cg-card-body p-0 table-responsive">
+            <table class="cg-table">
+                <thead>
+                    <tr>
+                        <th>Snapshot</th>
+                        <th>Student Name</th>
+                        <th>Roll Number</th>
+                        <th>Confidence</th>
+                        <th>Status</th>
+                        <th>Location</th>
+                        <th>Time</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in recent_logs %}
+                        <tr>
+                            <td>
+                                {% if log.snapshot_image %}
+                                    <img src="{{ log.snapshot_image.url }}" alt="Snapshot" width="44" height="44" style="border-radius: 6px; object-fit: cover;">
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="fw-bold text-white">{{ log.matched_student.full_name }}</td>
+                            <td class="font-monospace text-white fw-bold">{{ log.matched_student.student_id }}</td>
+                            <td>
+                                <span class="badge {% if log.confidence_percentage >= 70 %}badge-high{% else %}badge-low{% endif %}">
+                                    {{ log.confidence_percentage }}%
+                                </span>
+                            </td>
+                            <td><span class="badge bg-secondary">{{ log.get_status_display }}</span></td>
+                            <td style="color: #cbd5e1;">{{ log.location }}</td>
+                            <td class="small" style="color: #cbd5e1;">{{ log.timestamp|timesince }} ago</td>
+                            <td>
+                                <a href="{% url 'dashboard:detection_detail' log.id %}" class="btn btn-sm btn-outline-light">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-muted">No detection events recorded yet.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('singleFrameForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+    const resultBox = document.getElementById('testResultBox');
+    const resultContent = document.getElementById('testResultContent');
+    const submitBtn = document.getElementById('btnTestSubmit');
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Processing...';
+    resultBox.classList.remove('d-none');
+    resultContent.innerHTML = 'Analyzing frame...';
+
+    try {
+        const response = await fetch('/surveillance/process-frame/', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.success && data.detections && data.detections.length > 0) {
+            let html = '<ul class="list-unstyled mb-0">';
+            data.detections.forEach(d => {
+                if (d.matched) {
+                    html += `<li class="mb-2 p-2 bg-danger bg-opacity-10 border border-danger border-opacity-25 rounded">
+                        <strong class="text-danger">MATCH DETECTED:</strong> ${d.student_name} (${d.student_id})<br>
+                        Confidence: <strong>${d.confidence_pct}%</strong> &bull; Status: <span class="badge badge-high">${d.classification}</span>
+                    </li>`;
+                } else {
+                    html += `<li class="mb-2 p-2 bg-secondary bg-opacity-10 border border-secondary border-opacity-25 rounded text-light">
+                        Face detected &bull; Similarity: ${d.confidence_pct}% (Below 65% threshold - Visitor)
+                    </li>`;
+                }
+            });
+            html += '</ul>';
+            resultContent.innerHTML = html;
+        } else if (data.success) {
+            resultContent.innerHTML = '<span class="text-warning">No faces found in uploaded image.</span>';
+        } else {
+            resultContent.innerHTML = `<span class="text-danger">Error: ${data.message || data.error}</span>`;
+        }
+    } catch (err) {
+        resultContent.innerHTML = `<span class="text-danger">Network Error: ${err.message}</span>`;
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass me-1"></i> Run Biometric Analysis';
+    }
+});
+</script>
+{% endblock %}

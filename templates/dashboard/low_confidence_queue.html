@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Low-Confidence Review Queue - CampusGuard AI{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+
+    <!-- Page Header & Filtering Tabs -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="cg-pulse-dot bg-warning"></span>
+                <h2 class="h3 fw-bold mb-0 text-warning">Low-Confidence Review Queue (65%–70%)</h2>
+            </div>
+            <p class="small mb-0 mt-1" style="color: #cbd5e1; font-weight: 400; font-size: 0.92rem;">
+                Borderline facial similarity matches. Requires human verification before dispatching security alerts or marking as OK.
+            </p>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <!-- Filter Tabs -->
+            <div class="btn-group btn-group-sm me-2" role="group">
+                <a href="{% url 'dashboard:low_confidence_queue' %}" 
+                   class="btn {% if not show_all %}btn-warning text-dark fw-bold{% else %}btn-outline-secondary{% endif %}">
+                    <i class="fa-solid fa-circle-question me-1"></i> Active 
+                    {% if active_count > 0 %}<span class="badge bg-dark text-warning ms-1">{{ active_count }}</span>{% endif %}
+                </a>
+                <a href="{% url 'dashboard:low_confidence_queue' %}?show=all" 
+                   class="btn {% if show_all %}btn-warning text-dark fw-bold{% else %}btn-outline-secondary{% endif %}">
+                    <i class="fa-solid fa-list-check me-1"></i> All History
+                </a>
+            </div>
+
+            <a href="{% url 'dashboard:overview' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> Back to Overview
+            </a>
+            <button onclick="window.location.reload()" class="btn btn-sm btn-outline-light">
+                <i class="fa-solid fa-rotate me-1"></i> Refresh List
+            </button>
+        </div>
+    </div>
+
+    <!-- Content View List (Windows Explorer Inspired) -->
+    {% if detections %}
+    <div class="cg-content-view-container">
+        {% for log in detections %}
+        <div class="cg-content-row low-conf {% if log.status == 'acknowledged' %}acknowledged{% endif %} d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+            
+            <!-- Left: Dual Photos (Official + Gate Capture) -->
+            <div class="cg-content-thumb-container">
+                <div class="cg-content-thumb-box" title="Official Reference Photo">
+                    {% if log.matched_student.photo %}
+                    <img src="{{ log.matched_student.photo.url }}" alt="Official Reference">
+                    {% else %}
+                    <div class="w-100 h-100 d-flex align-items-center justify-content-center text-muted small">No Img</div>
+                    {% endif %}
+                    <span class="cg-thumb-tag">Official</span>
+                </div>
+                <div class="cg-content-thumb-box capture-box-low" title="Surveillance Gate Capture">
+                    {% if log.snapshot_image %}
+                    <img src="{{ log.snapshot_image.url }}" alt="Gate Capture">
+                    {% else %}
+                    <div class="w-100 h-100 d-flex align-items-center justify-content-center text-warning small">No Snap</div>
+                    {% endif %}
+                    <span class="cg-thumb-tag capture-tag-low">Capture</span>
+                </div>
+            </div>
+
+            <!-- Middle: Person Details (Line 1: Name + Badges | Line 2: Details) -->
+            <div class="flex-grow-1 min-w-0">
+                <!-- Line 1: Person Name, Match %, Status Badge -->
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                    <h5 class="cg-content-title mb-0">{{ log.matched_student.full_name }}</h5>
+                    <span class="badge badge-low py-1 px-2">
+                        <i class="fa-solid fa-bullseye me-1"></i>{{ log.confidence_percentage }}% Match
+                    </span>
+                    
+                    {% if log.status == 'verified' %}
+                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 py-1 px-2">
+                        <i class="fa-solid fa-circle-check me-1"></i> Verified &amp; Alert Sent
+                    </span>
+                    {% elif log.status == 'acknowledged' %}
+                    <span class="badge bg-secondary py-1 px-2">
+                        <i class="fa-solid fa-check-double me-1"></i> Acknowledged (OK)
+                    </span>
+                    {% else %}
+                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-50 py-1 px-2">
+                        <i class="fa-solid fa-triangle-exclamation me-1"></i> Awaiting Human Verification
+                    </span>
+                    {% endif %}
+                </div>
+
+                <!-- Line 2: Metadata (ID, Dept, Location, Reason) -->
+                <div class="cg-content-meta-line d-flex flex-wrap align-items-center gap-2">
+                    <span>
+                        <span class="cg-content-meta-label">Roll No:</span>
+                        <span class="font-monospace text-light fw-bold">{{ log.matched_student.student_id }}</span>
+                    </span>
+                    <span class="text-muted">&bull;</span>
+                    <span>
+                        <span class="cg-content-meta-label">Dept:</span>
+                        <span class="cg-content-meta-val">{{ log.matched_student.department }} ({{ log.matched_student.year }})</span>
+                    </span>
+                    <span class="text-muted">&bull;</span>
+                    <span>
+                        <span class="cg-content-meta-label">Location:</span>
+                        <i class="fa-solid fa-location-dot text-danger me-1"></i>
+                        <span class="cg-content-meta-val">{{ log.location }} ({{ log.camera_id }})</span>
+                    </span>
+                    {% if log.matched_student.suspension_reason %}
+                    <span class="text-muted">&bull;</span>
+                    <span>
+                        <span class="cg-content-meta-label">Reason:</span>
+                        <span class="text-warning-emphasis">{{ log.matched_student.suspension_reason|truncatechars:40 }}</span>
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Right: Timestamp & Action Buttons -->
+            <div class="d-flex flex-column align-items-start align-items-md-end justify-content-center gap-2 flex-shrink-0">
+                <!-- Date / Time -->
+                <div class="text-muted small text-md-end">
+                    <div>
+                        <span class="cg-content-meta-label">Date detected:</span>
+                        <strong class="text-light">{{ log.timestamp|date:"d-m-Y H:i" }}</strong>
+                    </div>
+                    <div class="text-muted" style="font-size: 0.78rem;">
+                        <i class="fa-solid fa-clock me-1"></i>{{ log.timestamp|timesince }} ago
+                    </div>
+                </div>
+
+                <!-- Buttons: Audit Details, Verify & Alert, OK Button -->
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <a href="{% url 'dashboard:detection_detail' log.id %}" class="btn btn-outline-light btn-sm py-1 px-2" title="Audit Evidence & Logs">
+                        <i class="fa-solid fa-file-shield me-1"></i> Audit Details
+                    </a>
+
+                    {% if log.status == 'low_confidence' %}
+                    <!-- 1. Verify button (Marks verified by security officer) -->
+                    <form method="post" action="{% url 'dashboard:verify_only_detection' log.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="btn btn-primary btn-sm py-1 px-3 fw-bold shadow-sm" title="Confirm match and mark as Verified">
+                            <i class="fa-solid fa-user-check me-1"></i> Verify
+                        </button>
+                    </form>
+
+                    <!-- 2. Send Alert button (Dispatches alert email to authorities) -->
+                    <form method="post" action="{% url 'dashboard:send_alert_detection' log.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="btn btn-danger btn-sm py-1 px-3 fw-bold shadow-sm" title="Dispatch email alert to campus security authorities">
+                            <i class="fa-solid fa-paper-plane me-1"></i> Send Alert
+                        </button>
+                    </form>
+                    {% else %}
+                    <span class="badge bg-secondary py-1 px-2 text-muted">
+                        <i class="fa-solid fa-check-double me-1"></i> Resolved
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="cg-card text-center py-5">
+        <div class="cg-card-body">
+            <i class="fa-solid fa-circle-check text-success display-3 mb-3"></i>
+            <h4 class="fw-bold text-white">
+                {% if show_all %}
+                No Low-Confidence Records Found
+                {% else %}
+                Low-Confidence Review Queue is Empty
+                {% endif %}
+            </h4>
+            <p class="text-muted max-w-md mx-auto">
+                {% if show_all %}
+                No borderline similarity detections (65%–70%) have been recorded yet.
+                {% else %}
+                All borderline detections (65%–70%) have been resolved or reviewed.
+                {% endif %}
+            </p>
+            <div class="d-flex justify-content-center gap-2 mt-3">
+                {% if not show_all %}
+                <a href="{% url 'dashboard:low_confidence_queue' %}?show=all" class="btn btn-outline-secondary btn-sm">
+                    <i class="fa-solid fa-list-check me-1"></i> View All History
+                </a>
+                {% endif %}
+                <a href="{% url 'dashboard:overview' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fa-solid fa-arrow-left me-1"></i> Return to Command Center
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

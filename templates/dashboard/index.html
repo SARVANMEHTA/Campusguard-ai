@@ -1,0 +1,351 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Command Center - CampusGuard AI{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+
+    <!-- Top Header & Quick Action Bar -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <h2 class="h3 fw-bold mb-1 text-white">Campus Surveillance Command Center</h2>
+            <p class="small mb-0" style="color: #cbd5e1; font-weight: 400; font-size: 0.92rem;">Real-time biometric monitoring and suspended student access deterrence.</p>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <div class="form-check form-switch small">
+                <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
+                <label class="form-check-label text-light fw-medium" for="autoRefreshToggle" style="color: #cbd5e1;">Live Polling (8s)</label>
+            </div>
+            <a href="{% url 'surveillance:live_monitor' %}" class="btn btn-danger">
+                <i class="fa-solid fa-video me-1"></i> Open Gate Monitor
+            </a>
+        </div>
+    </div>
+
+    <!-- Stat Metrics Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-xl-3">
+            <div class="cg-card cg-stat-card border-danger">
+                <div>
+                    <div class="cg-stat-label text-danger">High Conf Pending</div>
+                    <div class="cg-stat-value text-danger">{{ nav_high_conf_count }}</div>
+                    <small class="fw-semibold" style="color: #fca5a5;"><i class="fa-solid fa-triangle-exclamation text-danger me-1"></i> Requires
+                        instant review</small>
+                </div>
+                <div class="cg-stat-icon text-danger">
+                    <i class="fa-solid fa-bell"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="cg-card cg-stat-card border-warning">
+                <div>
+                    <div class="cg-stat-label text-warning">Low Conf Pending</div>
+                    <div class="cg-stat-value text-warning">{{ nav_low_conf_count }}</div>
+                    <small class="fw-semibold" style="color: #fde047;"><i class="fa-solid fa-eye text-warning me-1"></i> Side-by-side
+                        inspect</small>
+                </div>
+                <div class="cg-stat-icon text-warning">
+                    <i class="fa-solid fa-circle-question"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="cg-card cg-stat-card border-success">
+                <div>
+                    <div class="cg-stat-label text-success">Verified Alerts Sent</div>
+                    <div class="cg-stat-value text-success">{{ verified_today_count }}</div>
+                    <small class="fw-semibold" style="color: #86efac;"><i class="fa-solid fa-envelope-circle-check text-success me-1"></i>
+                        Notified campus authorities</small>
+                </div>
+                <div class="cg-stat-icon text-success">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="cg-card cg-stat-card border-primary">
+                <div>
+                    <div class="cg-stat-label text-primary">Active Suspended Roster</div>
+                    <div class="cg-stat-value text-primary">{{ active_suspended_count }}</div>
+                    <small class="fw-semibold" style="color: #93c5fd;"><i class="fa-solid fa-id-card-clip text-primary me-1"></i> Indexed facial
+                        vectors</small>
+                </div>
+                <div class="cg-stat-icon text-primary">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- High-Priority Urgent Detection Queue Section -->
+    {% if high_conf_queue %}
+    <div class="mb-4">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <h5 class="fw-bold text-danger mb-0">
+                <span class="cg-pulse-dot"></span> URGENT: High Confidence Matches — Alerts Dispatched Immediately (&gt;70%)
+            </h5>
+            <a href="{% url 'dashboard:high_confidence_queue' %}" class="btn btn-sm btn-outline-danger">
+                View All ({{ high_conf_queue|length }}) <i class="fa-solid fa-arrow-right ms-1"></i>
+            </a>
+        </div>
+
+        <div class="row g-3">
+            {% for log in high_conf_queue %}
+            <div class="col-md-6 col-xl-4">
+                <div class="cg-card cg-alert-card h-100">
+                    <div class="cg-card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge badge-high me-1">{{ log.confidence_percentage }}% Match</span>
+                            <span class="text-muted small">{{ log.camera_id }}</span>
+                        </div>
+                        <small class="text-light">{{ log.timestamp|timesince }} ago</small>
+                    </div>
+                    <div class="cg-card-body">
+                        <div class="photo-comparison-box mb-3">
+                            <div>
+                                {% if log.matched_student.photo %}
+                                <img src="{{ log.matched_student.photo.url }}" alt="Reference"
+                                    title="Official Student Photo">
+                                {% else %}
+                                <div class="bg-secondary text-center py-5 rounded">No Ref</div>
+                                {% endif %}
+                                <div class="text-center small text-muted mt-1 fw-bold">Official Photo</div>
+                            </div>
+                            <div>
+                                {% if log.snapshot_image %}
+                                <img src="{{ log.snapshot_image.url }}" alt="Snapshot" title="Gate CCTV Capture">
+                                {% else %}
+                                <div class="bg-secondary text-center py-5 rounded">No Snap</div>
+                                {% endif %}
+                                <div class="text-center small text-danger mt-1 fw-bold">CCTV Snapshot</div>
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold text-white mb-1">{{ log.matched_student.full_name }}</h6>
+                        <p class="text-muted small mb-2">
+                            Roll No: <span class="text-light fw-bold">{{ log.matched_student.student_id }}</span> &bull;
+                            {{ log.matched_student.department }}
+                        </p>
+                        <p
+                            class="small text-danger-subtle bg-danger bg-opacity-10 p-2 rounded mb-3 border border-danger border-opacity-25">
+                            <strong>Suspension Reason:</strong> {{ log.matched_student.suspension_reason|default:"Disciplinary Suspension"|truncatechars:80 }}
+                        </p>
+
+                        <div class="alert {{ log.alert_status_info.badge_class }} p-2 mb-3 d-flex align-items-center gap-2" style="font-size: 0.8rem;">
+                            <i class="fa-solid {{ log.alert_status_info.icon }} fs-6"></i>
+                            <div>
+                                <strong class="text-white">{{ log.alert_status_info.title }}</strong><br>
+                                <span class="text-muted" style="font-size: 0.76rem;">{{ log.alert_status_info.description }}</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'dashboard:detection_detail' log.id %}" class="btn btn-outline-light btn-sm flex-grow-1">
+                                <i class="fa-solid fa-file-lines me-1"></i> Audit Details
+                            </a>
+                            <form method="post" action="{% url 'dashboard:reject_detection' log.id %}"
+                                class="flex-shrink-0">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-warning btn-sm"
+                                    title="Mark False Positive"
+                                    onclick="return confirm('Flag this detection as False Positive?')">
+                                    <i class="fa-solid fa-xmark me-1"></i> False Positive
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Middle Row: Live Stream Preview & Low Confidence Queue -->
+    <div class="row g-4 mb-4">
+        <!-- Live Surveillance Stream Box -->
+        <div class="col-lg-7">
+            <div class="cg-card h-100">
+                <div class="cg-card-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-camera text-danger"></i>
+                        <span>Live Gate Stream Preview</span>
+                    </div>
+                    <span class="badge bg-success"><i class="fa-solid fa-circle text-white me-1"
+                            style="font-size: 6px;"></i> Active Ingestion</span>
+                </div>
+                <div class="cg-card-body p-0">
+                    <div class="video-stream-container">
+                        <img src="{% url 'surveillance:live_stream' %}" alt="Live Camera Stream"
+                            onerror="this.onerror=null; this.src='https://placehold.co/640x360/0b0f19/ef4444?text=Live+Gate+Stream+Connecting...';" />
+                        <div class="video-overlay-badge">
+                            <i class="fa-solid fa-location-dot text-danger me-1"></i> Main Gate - Gate 1 &bull; 1080p
+                        </div>
+                    </div>
+                </div>
+                <div
+                    class="p-3 bg-dark border-top border-secondary border-opacity-25 d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">AI Matcher analyzing sampled frames at 5 FPS against {{ active_suspended_count }} active embeddings.</span>
+                    <a href="{% url 'surveillance:live_monitor' %}" class="btn btn-sm btn-outline-light">Fullscreen
+                        Monitor <i class="fa-solid fa-expand ms-1"></i></a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Low-Confidence Queue Box -->
+        <div class="col-lg-5">
+            <div class="cg-card h-100">
+                <div class="cg-card-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-circle-question text-warning"></i>
+                        <span>Low-Confidence Review Queue (65-70%)</span>
+                    </div>
+                    <a href="{% url 'dashboard:low_confidence_queue' %}" class="btn btn-sm btn-outline-warning">View
+                        All</a>
+                </div>
+                <div class="cg-card-body p-0">
+                    {% if low_conf_queue %}
+                    <div class="list-group list-group-flush bg-transparent">
+                        {% for item in low_conf_queue %}
+                        <div class="list-group-item bg-transparent text-light border-secondary border-opacity-25 p-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <h6 class="mb-1 fw-bold text-white fs-6">{{ item.matched_student.full_name }}</h6>
+                                    <div class="small" style="color: #cbd5e1;">
+                                        Roll: <span class="text-white fw-bold font-monospace">{{ item.matched_student.student_id }}</span> &bull; 
+                                        <span class="text-light">{{ item.location }}</span>
+                                    </div>
+                                </div>
+                                <span class="badge badge-low fs-6">{{ item.confidence_percentage }}%</span>
+                            </div>
+                            <div
+                                class="d-flex align-items-center justify-content-between mt-2 pt-2 border-top border-secondary border-opacity-25">
+                                <span class="small font-monospace" style="color: #94a3b8; font-weight: 500;">
+                                    <i class="fa-regular fa-clock me-1"></i>{{ item.timestamp|date:"H:i:s" }}
+                                </span>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'dashboard:detection_detail' item.id %}"
+                                        class="btn btn-outline-info btn-sm">Inspect</a>
+                                    <form method="post" action="{% url 'dashboard:verify_detection' item.id %}"
+                                        style="display:inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-warning btn-sm text-dark fw-semibold"
+                                            onclick="return confirm('Verify match and dispatch email alert?')">Verify</button>
+                                    </form>
+                                    <form method="post" action="{% url 'dashboard:reject_detection' item.id %}"
+                                        style="display:inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Dismiss</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-circle-check text-success mb-2" style="font-size: 1.2rem;"></i>
+                        <p class="mb-0">No low-confidence matches pending review.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Detection Audit Log Table -->
+    <div class="cg-card">
+        <div class="cg-card-header">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-list-ul text-primary"></i>
+                <span>Recent Detection Events</span>
+            </div>
+            <a href="{% url 'dashboard:detection_logs' %}" class="btn btn-sm btn-outline-secondary">Complete Audit
+                Log</a>
+        </div>
+        <div class="cg-card-body p-0 table-responsive">
+            <table class="cg-table">
+                <thead>
+                    <tr>
+                        <th>Snapshot</th>
+                        <th>Student Name &amp; ID</th>
+                        <th>Location / Camera</th>
+                        <th>Confidence</th>
+                        <th>Status</th>
+                        <th>Alert Dispatched</th>
+                        <th>Timestamp</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in recent_logs %}
+                    <tr>
+                        <td>
+                            {% if log.snapshot_image %}
+                            <img src="{{ log.snapshot_image.url }}" alt="Snapshot" width="48" height="48"
+                                style="border-radius: 6px; object-fit: cover; border: 1px solid #334155;">
+                            {% else %}
+                            <span class="text-muted small">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if log.matched_student %}
+                            <div class="fw-bold text-white">{{ log.matched_student.full_name }}</div>
+                            <small class="text-muted font-monospace">{{ log.matched_student.student_id }}</small>
+                            {% else %}
+                            <span class="text-muted">Unidentified Face</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div>{{ log.location }}</div>
+                            <small class="text-muted">{{ log.camera_id }}</small>
+                        </td>
+                        <td>
+                            {% if log.confidence_percentage >= 70 %}
+                            <span class="badge badge-high">{{ log.confidence_percentage }}%</span>
+                            {% elif log.confidence_percentage >= 65 %}
+                            <span class="badge badge-low">{{ log.confidence_percentage }}%</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ log.confidence_percentage }}%</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span
+                                class="badge {% if log.status == 'verified' %}badge-verified{% elif log.status == 'rejected' %}badge-rejected{% elif log.status == 'high_confidence' %}badge-high{% else %}badge-low{% endif %}">
+                                {{ log.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if log.alert_sent %}
+                            <span class="text-success small fw-bold"><i class="fa-solid fa-check-circle me-1"></i>
+                                Yes</span>
+                            {% else %}
+                            <span class="text-muted small">No</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">{{ log.timestamp|date:"d M, H:i:s" }}</td>
+                        <td>
+                            <a href="{% url 'dashboard:detection_detail' log.id %}" class="btn btn-sm btn-outline-info">
+                                <i class="fa-solid fa-circle-info"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            No detection records in database. Start surveillance or run seed data generator.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

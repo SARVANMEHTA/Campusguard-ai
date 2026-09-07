@@ -209,17 +209,18 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.environ.get('CAMPUSGUARD_EMAIL_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('CAMPUSGUARD_EMAIL_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.environ.get('CAMPUSGUARD_DEFAULT_FROM_EMAIL', 'CampusGuard AI <alerts@campusguard.local>')
-EMAIL_TIMEOUT = 10
+EMAIL_HOST_USER = os.environ.get('CAMPUSGUARD_EMAIL_USER', '').strip()
+EMAIL_HOST_PASSWORD = os.environ.get('CAMPUSGUARD_EMAIL_PASSWORD', '').replace(' ', '').strip()
+DEFAULT_FROM_EMAIL = os.environ.get('CAMPUSGUARD_DEFAULT_FROM_EMAIL', '') or (f"CampusGuard AI <{EMAIL_HOST_USER}>" if EMAIL_HOST_USER else 'CampusGuard AI <alerts@campusguard.local>')
+EMAIL_TIMEOUT = 15
 
-# Authority Alert Recipients
-ALERT_RECIPIENT_EMAILS = [
+# Authority Alert Recipients (includes EMAIL_HOST_USER if set so tester receives alerts)
+_primary_user = os.environ.get('CAMPUSGUARD_EMAIL_USER', '').strip()
+ALERT_RECIPIENT_EMAILS = [_primary_user] if _primary_user else []
+ALERT_RECIPIENT_EMAILS.extend([
     'security.desk@campus.edu',
-    'chief.proctor@campus.edu',
-    'hod.office@campus.edu'
-]
+    'chief.proctor@campus.edu'
+])
 
 # ==========================================
 # WhatsApp Alert Configuration (Twilio)

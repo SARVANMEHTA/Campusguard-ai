@@ -30,35 +30,77 @@
         <!-- Live Video Stream -->
         <div class="col-xl-8">
             <div class="cg-card">
-                <div class="cg-card-header d-flex justify-content-between align-items-center">
+                <div class="cg-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <div class="d-flex align-items-center gap-2">
                         <span class="cg-pulse-dot"></span>
-                        <span class="fw-bold text-white">{{ default_location }} (CAM-01)</span>
-                        <span id="nodeStatusBadge" class="badge bg-dark border border-warning text-warning ms-2">
-                            <i class="fa-solid fa-power-off me-1"></i> Gate 1 Node: STANDBY
+                        <span class="fw-bold text-white">{{ default_location }}</span>
+                        <span id="nodeStatusBadge" class="badge bg-dark border border-warning text-warning ms-1" style="display: none;">
+                            <i class="fa-solid fa-power-off me-1"></i> Node: STANDBY
                         </span>
                     </div>
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('streamImg').src = '{% url 'surveillance:live_stream' %}?' + new Date().getTime();">
-                            <i class="fa-solid fa-rotate me-1"></i> Reconnect
-                        </button>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" id="btnTabWebcam" class="btn btn-primary fw-bold" onclick="switchStreamMode('webcam')">
+                                <i class="fa-solid fa-camera me-1"></i> My Camera
+                            </button>
+                            <button type="button" id="btnTabServer" class="btn btn-outline-secondary" onclick="switchStreamMode('server')">
+                                <i class="fa-solid fa-tower-broadcast me-1"></i> Gate 1 CCTV Feed
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="cg-card-body p-0">
-                    <div class="video-stream-container" style="min-height: 460px;">
-                        <img id="streamImg" src="{% url 'surveillance:live_stream' %}" alt="Live Camera Feed" onerror="this.onerror=null; this.src='{% url 'surveillance:live_stream' %}';" />
-                        <div class="video-overlay-badge" id="streamOverlayText">
-                            <span class="cg-pulse-dot green"></span> Live CCTV Monitor Active &bull; Gate 1 Stream
+                    <div class="video-stream-container" id="videoContainer" style="min-height: 480px; position: relative;">
+                        <!-- Mode A: Browser / Mobile Web Camera -->
+                        <div id="webcamWrapper" style="width: 100%; height: 100%; position: relative; min-height: 480px; display: flex; align-items: center; justify-content: center;">
+                            <video id="webcamVideo" autoplay playsinline muted style="width: 100%; height: 100%; max-height: 480px; object-fit: contain; display: none;"></video>
+                            <canvas id="webcamCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none;"></canvas>
+                            
+                            <!-- Standby Prompt when Camera is Off -->
+                            <div id="webcamPlaceholder" class="text-center p-4">
+                                <div class="rounded-circle bg-primary bg-opacity-20 text-primary p-3 d-inline-flex align-items-center justify-content-center mb-3" style="width: 72px; height: 72px;">
+                                    <i class="fa-solid fa-camera" style="font-size: 2rem;"></i>
+                                </div>
+                                <h5 class="fw-bold text-white mb-2">Live Biometric Device Camera</h5>
+                                <p class="small mb-3 text-secondary mx-auto" style="max-width: 460px; line-height: 1.5;">
+                                    Click below to start your laptop or mobile camera. The deep neural network AI scans frames in real time, detecting faces and matching against the suspended student roster with visual bounding boxes.
+                                </p>
+                                <button class="btn btn-success fw-bold px-4 py-2" id="btnStartCamera" onclick="startWebcam()">
+                                    <i class="fa-solid fa-play me-2"></i> Start Device Camera
+                                </button>
+                            </div>
+
+                            <!-- Ingest status badge overlay -->
+                            <div class="video-overlay-badge" id="webcamOverlayBadge" style="display: none;">
+                                <span class="cg-pulse-dot green"></span> <span id="webcamOverlayText">Device Camera Active • Scanning Faces</span>
+                            </div>
+                        </div>
+
+                        <!-- Mode B: Gate 1 CCTV Ingest (Server / Laptop Node) -->
+                        <div id="serverWrapper" style="width: 100%; height: 100%; position: relative; display: none;">
+                            <img id="streamImg" src="{% url 'surveillance:live_stream' %}" alt="Live Camera Feed" onerror="this.onerror=null; this.src='{% url 'surveillance:live_stream' %}';" style="width: 100%; max-height: 480px; object-fit: contain;" />
+                            <div class="video-overlay-badge" id="streamOverlayText">
+                                <span class="cg-pulse-dot green"></span> Gate 1 CCTV Ingest &bull; Server Stream
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="p-3 bg-dark border-top border-secondary border-opacity-25 d-flex flex-wrap justify-content-between align-items-center gap-3">
-                    <div class="d-flex align-items-center gap-3 small">
+                    <div class="d-flex align-items-center gap-2" id="webcamControls" style="display: none;">
+                        <button class="btn btn-danger btn-sm fw-bold" onclick="stopWebcam()">
+                            <i class="fa-solid fa-stop me-1"></i> Stop Camera
+                        </button>
+                        <button class="btn btn-outline-light btn-sm" id="btnFlipCamera" onclick="flipCamera()">
+                            <i class="fa-solid fa-camera-rotate me-1"></i> Flip
+                        </button>
+                        <span class="small font-monospace text-info ms-2" id="scanStatText">Live AI Scanner Active</span>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-3 small ms-auto">
                         <span class="text-danger fw-semibold"><i class="fa-solid fa-square me-1"></i> Red: High Conf (&gt;70%)</span>
                         <span class="text-warning fw-semibold"><i class="fa-solid fa-square me-1"></i> Orange: Low Conf (65-70%)</span>
-                        <span class="text-success fw-semibold"><i class="fa-solid fa-square me-1"></i> Green: Verified Non-Suspended</span>
+                        <span class="text-success fw-semibold"><i class="fa-solid fa-square me-1"></i> Green: Verified Visitor</span>
                     </div>
-                    <span class="small" style="color: #94a3b8;">Auto-deduplication cooldown: 3 min</span>
                 </div>
             </div>
         </div>
@@ -233,8 +275,211 @@ document.getElementById('singleFrameForm').addEventListener('submit', async (e) 
     }
 });
 
+// =================================================================
+// Browser / Mobile Device Camera Scanner
+// =================================================================
+let webcamStream = null;
+let isScanning = false;
+let isScanInFlight = false;
+let currentFacingMode = 'user'; // 'user' (front) or 'environment' (back)
+let currentStreamMode = 'webcam';
+
+function switchStreamMode(mode) {
+    currentStreamMode = mode;
+    const tabWebcam = document.getElementById('btnTabWebcam');
+    const tabServer = document.getElementById('btnTabServer');
+    const webcamWrapper = document.getElementById('webcamWrapper');
+    const serverWrapper = document.getElementById('serverWrapper');
+    const nodeBadge = document.getElementById('nodeStatusBadge');
+
+    if (mode === 'webcam') {
+        tabWebcam.className = 'btn btn-primary fw-bold';
+        tabServer.className = 'btn btn-outline-secondary';
+        webcamWrapper.style.display = 'flex';
+        serverWrapper.style.display = 'none';
+        if (nodeBadge) nodeBadge.style.display = 'none';
+    } else {
+        stopWebcam();
+        tabWebcam.className = 'btn btn-outline-secondary';
+        tabServer.className = 'btn btn-primary fw-bold';
+        webcamWrapper.style.display = 'none';
+        serverWrapper.style.display = 'block';
+        if (nodeBadge) nodeBadge.style.display = 'inline-block';
+        // Reconnect stream image
+        document.getElementById('streamImg').src = '{% url "surveillance:live_stream" %}?' + new Date().getTime();
+    }
+}
+
+async function startWebcam() {
+    try {
+        const constraints = {
+            video: {
+                facingMode: currentFacingMode,
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            },
+            audio: false
+        };
+        webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
+        const video = document.getElementById('webcamVideo');
+        video.srcObject = webcamStream;
+        await video.play();
+
+        document.getElementById('webcamPlaceholder').style.display = 'none';
+        video.style.display = 'block';
+        document.getElementById('webcamCanvas').style.display = 'block';
+        document.getElementById('webcamOverlayBadge').style.display = 'block';
+        document.getElementById('webcamControls').style.display = 'flex';
+
+        isScanning = true;
+        scanLoop();
+    } catch (err) {
+        alert('Could not access camera: ' + err.message + '\nPlease check that camera permissions are allowed in your browser settings.');
+        console.error('Camera error:', err);
+    }
+}
+
+function stopWebcam() {
+    isScanning = false;
+    if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop());
+        webcamStream = null;
+    }
+    const video = document.getElementById('webcamVideo');
+    if (video) {
+        video.srcObject = null;
+        video.style.display = 'none';
+    }
+    const canvas = document.getElementById('webcamCanvas');
+    if (canvas) {
+        canvas.style.display = 'none';
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    const placeholder = document.getElementById('webcamPlaceholder');
+    if (placeholder) placeholder.style.display = 'block';
+    const overlay = document.getElementById('webcamOverlayBadge');
+    if (overlay) overlay.style.display = 'none';
+    const controls = document.getElementById('webcamControls');
+    if (controls) controls.style.display = 'none';
+}
+
+function flipCamera() {
+    currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+    stopWebcam();
+    setTimeout(startWebcam, 300);
+}
+
+// Adaptive scanning loop: only triggers next frame after response returns
+async function scanLoop() {
+    if (!isScanning) return;
+    if (!isScanInFlight) {
+        const video = document.getElementById('webcamVideo');
+        if (video && video.readyState >= 2) {
+            isScanInFlight = true;
+            try {
+                await captureAndDetect(video);
+            } finally {
+                isScanInFlight = false;
+            }
+        }
+    }
+    if (isScanning) {
+        setTimeout(scanLoop, 1100);
+    }
+}
+
+async function captureAndDetect(video) {
+    const canvas = document.getElementById('webcamCanvas');
+    if (!canvas || !video) return;
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = video.clientWidth;
+    canvas.height = video.clientHeight;
+
+    const vW = video.videoWidth || 640;
+    const vH = video.videoHeight || 480;
+
+    // Capture offscreen snapshot frame (scaled to 480w for speed)
+    const offscreen = document.createElement('canvas');
+    const sendW = 480;
+    const sendH = Math.round(sendW * (vH / vW));
+    offscreen.width = sendW;
+    offscreen.height = sendH;
+    const offCtx = offscreen.getContext('2d');
+    offCtx.drawImage(video, 0, 0, sendW, sendH);
+
+    const blob = await new Promise(resolve => offscreen.toBlob(resolve, 'image/jpeg', 0.80));
+    if (!blob) return;
+
+    const formData = new FormData();
+    formData.append('image', blob, 'frame.jpg');
+    formData.append('continuous', 'true');
+    formData.append('location', 'Live Browser Scanner');
+    formData.append('camera_id', 'CAM-BROWSER');
+
+    const startTime = performance.now();
+    try {
+        const res = await fetch('/surveillance/process-frame/', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        const latency = Math.round(performance.now() - startTime);
+        const statElem = document.getElementById('scanStatText');
+        if (statElem) statElem.textContent = `AI Latency: ${latency}ms`;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (data.success && data.detections && data.detections.length > 0) {
+            const scaleX = canvas.width / (data.frame_width || sendW);
+            const scaleY = canvas.height / (data.frame_height || sendH);
+
+            data.detections.forEach(d => {
+                if (!d.bbox) return;
+                const [bx, by, bw, bh] = d.bbox;
+                const x = bx * scaleX;
+                const y = by * scaleY;
+                const w = bw * scaleX;
+                const h = bh * scaleY;
+
+                let color = '#22c55e'; // Green (Safe visitor)
+                let label = `Visitor (${d.confidence_pct}%)`;
+
+                if (d.classification === 'high_confidence') {
+                    color = '#ef4444'; // Red
+                    label = `🚨 HIGH ALERT: ${d.student_name} (${d.confidence_pct}%)`;
+                } else if (d.classification === 'low_confidence') {
+                    color = '#f59e0b'; // Amber
+                    label = `⚠️ SUSPECT: ${d.student_name} (${d.confidence_pct}%)`;
+                }
+
+                // Draw bounding rectangle
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x, y, w, h);
+
+                // Draw label background pill
+                ctx.fillStyle = color;
+                ctx.font = 'bold 12px Inter, sans-serif';
+                const textW = ctx.measureText(label).width;
+                ctx.fillRect(x, Math.max(0, y - 24), textW + 12, 24);
+
+                // Draw text
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(label, x + 6, Math.max(16, y - 7));
+            });
+        }
+    } catch (err) {
+        console.debug('Frame scan error:', err);
+    }
+}
+
 // Live Heartbeat polling for Authorized Laptop Camera Node
 function pollNodeStatus() {
+    if (currentStreamMode !== 'server') return;
     fetch('{% url "surveillance:node_status" %}')
         .then(res => res.json())
         .then(data => {
@@ -255,6 +500,5 @@ function pollNodeStatus() {
         .catch(err => console.debug('Node status check:', err));
 }
 setInterval(pollNodeStatus, 3000);
-pollNodeStatus();
 </script>
 {% endblock %}

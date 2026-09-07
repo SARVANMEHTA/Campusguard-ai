@@ -257,22 +257,26 @@ def live_monitor_view(request):
 @csrf_exempt
 def process_single_image(request):
     """
-    Endpoint allowing admins or test scripts to upload a single test image/frame
+    Endpoint allowing browser live scanner, admins, or test scripts to submit an image/frame
     and run full face recognition and logging against the suspended database.
     """
     if request.method == 'POST' and 'image' in request.FILES:
         image_file = request.FILES['image']
-        location = request.POST.get('location', 'Gate 1 - Manual Inspection')
-        camera_id = request.POST.get('camera_id', 'INSPECTION-01')
+        location = request.POST.get('location', 'Gate 1 - Web Scanner')
+        camera_id = request.POST.get('camera_id', 'CAM-WEB')
+        continuous = request.POST.get('continuous', 'false').lower() == 'true'
 
         try:
             image_bytes = image_file.read()
             nparr = np.frombuffer(image_bytes, np.uint8)
             frame_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
+            if frame_bgr is None:
+                return JsonResponse({'success': False, 'message': 'Invalid image format.'})
+
             detections = face_engine.detect_faces(frame_bgr)
             if not detections:
-                return JsonResponse({'success': False, 'message': 'No face detected in submitted image.'})
+                return JsonResponse({'success': True, 'detections': [], 'message': 'No face detected.'})
 
             results = []
             for det in detections:
@@ -286,20 +290,30 @@ def process_single_image(request):
                     embedding=embedding,
                     camera_id=camera_id,
                     location=location,
-                    force_log=True
+                    force_log=(not continuous)
                 )
-                
+
+                x, y, w, h = [int(v) for v in bbox]
                 results.append({
                     'matched': res['matched'],
                     'student_name': res['student'].full_name if res['student'] else None,
                     'student_id': res['student'].student_id if res['student'] else None,
                     'confidence_pct': res['confidence_pct'],
                     'classification': res['classification'],
-                    'log_id': res['log_id']
+                    'log_id': res['log_id'],
+                    'logged': res.get('logged', False),
+                    'alert_dispatched': res.get('alert_dispatched', False),
+                    'bbox': [x, y, w, h],
                 })
 
-            return JsonResponse({'success': True, 'detections': results})
+            return JsonResponse({
+                'success': True,
+                'detections': results,
+                'frame_width': int(frame_bgr.shape[1]),
+                'frame_height': int(frame_bgr.shape[0]),
+            })
         except Exception as e:
+            logger.error(f"Error in process_single_image: {e}", exc_info=True)
             return JsonResponse({'success': False, 'error': str(e)})
 
     return JsonResponse({'success': False, 'error': 'Invalid request'})

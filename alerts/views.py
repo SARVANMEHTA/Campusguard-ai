@@ -136,6 +136,30 @@ def send_test_email(request):
             messages.error(request, "Please enter a test destination email address.")
             return redirect('alerts:recipient_list')
 
+        resend_key = getattr(settings, 'RESEND_API_KEY', '').strip()
+        if resend_key:
+            from .mailer import send_via_resend
+            html_body = f"""
+            <div style="font-family: Arial, sans-serif; padding: 25px; background: #0f172a; color: #f8fafc; border-radius: 10px; max-width: 600px; border: 1px solid #38bdf8;">
+                <h2 style="color: #38bdf8; margin-top: 0;">🛡️ CampusGuard AI Security Dispatch Check</h2>
+                <p>This is an automated verification test sent via <strong>Resend HTTPS REST API (Port 443)</strong>.</p>
+                <div style="background: rgba(56, 189, 248, 0.1); border-left: 4px solid #38bdf8; padding: 12px 16px; margin: 20px 0;">
+                    <p style="margin: 0; font-size: 14px; color: #e2e8f0;">
+                        <strong>Dispatch Channel Status:</strong> ACTIVE & VERIFIED<br>
+                        <strong>Destination:</strong> {test_email}<br>
+                        <strong>Network Transport:</strong> Secure HTTPS (Render Cloud Safe)
+                    </p>
+                </div>
+                <p style="font-size: 13px; color: #94a3b8;">When a suspended student is detected, official alerts with CCTV snapshots and disciplinary details will be delivered here instantly.</p>
+            </div>
+            """
+            ok, err = send_via_resend(resend_key, [test_email], "🛡️ [TEST] CampusGuard AI Notification Channel Check", html_body)
+            if ok:
+                messages.success(request, f"✔ Test security email successfully dispatched to '{test_email}' via Resend HTTPS! Please check your inbox.")
+                return redirect('alerts:recipient_list')
+            else:
+                messages.warning(request, f"Resend reported: {err}. Attempting SMTP fallback...")
+
         try:
             send_mail(
                 subject="🛡️ [TEST] CampusGuard AI Email Notification System Check",
@@ -149,6 +173,7 @@ def send_test_email(request):
             messages.error(request, f"Failed to send test email: {str(e)}")
 
     return redirect('alerts:recipient_list')
+
 
 
 def send_test_whatsapp(request):

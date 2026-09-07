@@ -213,6 +213,7 @@ EMAIL_HOST_USER = os.environ.get('CAMPUSGUARD_EMAIL_USER', '').strip()
 EMAIL_HOST_PASSWORD = os.environ.get('CAMPUSGUARD_EMAIL_PASSWORD', '').replace(' ', '').strip()
 DEFAULT_FROM_EMAIL = os.environ.get('CAMPUSGUARD_DEFAULT_FROM_EMAIL', '') or (f"CampusGuard AI <{EMAIL_HOST_USER}>" if EMAIL_HOST_USER else 'CampusGuard AI <alerts@campusguard.local>')
 EMAIL_TIMEOUT = 15
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '').strip()
 
 # Authority Alert Recipients (includes EMAIL_HOST_USER if set so tester receives alerts)
 _primary_user = os.environ.get('CAMPUSGUARD_EMAIL_USER', '').strip()

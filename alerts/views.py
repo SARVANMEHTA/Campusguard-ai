@@ -195,29 +195,13 @@ def send_test_whatsapp(request):
         content_sid = getattr(settings, 'TWILIO_WHATSAPP_CONTENT_SID', 'HXfe5ab5f00277942d4d4200328b4d403c').strip()
 
         if account_sid and auth_token:
-            try:
-                from twilio.rest import Client
-                client = Client(account_sid, auth_token)
-                try:
-                    # Try sending custom message body first
-                    client.messages.create(
-                        body="🛡️ *CampusGuard AI Test Alert*: System WhatsApp notification channel is active and verified!",
-                        from_=from_whatsapp,
-                        to=to_addr
-                    )
-                except Exception as body_err:
-                    if "ContentSid Required" in str(body_err) and content_sid:
-                        client.messages.create(
-                            from_=from_whatsapp,
-                            to=to_addr,
-                            content_sid=content_sid
-                        )
-                    else:
-                        raise body_err
-
+            from .whatsapp import send_twilio_message
+            test_body = "🛡️ *CampusGuard AI Test Alert*: System WhatsApp notification channel is active and verified!"
+            ok, err = send_twilio_message(account_sid, auth_token, from_whatsapp, to_addr, test_body, content_sid)
+            if ok:
                 messages.success(request, f"✔ Live test WhatsApp message dispatched to '{test_phone}'! Check your WhatsApp.")
-            except Exception as e:
-                messages.error(request, f"Failed to send WhatsApp test message: {str(e)}")
+            else:
+                messages.error(request, f"Failed to send WhatsApp test message: {err}")
         else:
             messages.info(request, f"[SIMULATION] Test WhatsApp alert dispatched to '{to_addr}' (Twilio credentials not configured in production mode).")
 

@@ -99,16 +99,64 @@ def format_whatsapp_message(detection_log, admin_user=None, admin_notes=""):
     return message
 
 
+def send_twilio_message(account_sid, auth_token, from_wa, to_wa, body, content_sid=None):
+    """
+    Sends a WhatsApp message via Twilio SDK if available, or direct Twilio REST HTTPS API via requests.
+    Guarantees no 'No module named twilio' import errors.
+    """
+    # 1. Try twilio Python SDK if installed
+    try:
+        from twilio.rest import Client
+        client = Client(account_sid, auth_token)
+        try:
+            msg = client.messages.create(body=body, from_=from_wa, to=to_wa)
+            return True, getattr(msg, 'sid', 'ok')
+        except Exception as body_err:
+            if ("ContentSid Required" in str(body_err) or "63016" in str(body_err)) and content_sid:
+                msg = client.messages.create(from_=from_wa, to=to_wa, content_sid=content_sid)
+                return True, getattr(msg, 'sid', 'ok')
+            raise body_err
+    except ImportError:
+        pass
+
+    # 2. Direct HTTP REST API via requests (zero external SDK dependency)
+    import requests
+    url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+    data = {
+        "From": from_wa,
+        "To": to_wa,
+        "Body": body,
+    }
+    resp = requests.post(url, data=data, auth=(account_sid, auth_token), timeout=15)
+    if resp.status_code in (200, 201):
+        try:
+            return True, resp.json().get('sid', 'ok')
+        except Exception:
+            return True, 'ok'
+
+    err_text = resp.text
+    if ("ContentSid" in err_text or "template" in err_text.lower() or "63016" in err_text) and content_sid:
+        retry_data = {
+            "From": from_wa,
+            "To": to_wa,
+            "ContentSid": content_sid,
+        }
+        resp2 = requests.post(url, data=retry_data, auth=(account_sid, auth_token), timeout=15)
+        if resp2.status_code in (200, 201):
+            return True, 'ok'
+        err_text = resp2.text
+
+    return False, err_text
+
+
 def send_whatsapp_alert(detection_log, admin_user=None, custom_recipients=None, admin_notes=""):
     """
     Dispatches WhatsApp security alerts to campus authorities.
     
     If Twilio credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN) are provided,
-    sends live WhatsApp messages using the official Twilio API.
+    sends live WhatsApp messages using the official Twilio API (or HTTP REST API).
     
-    If credentials are empty, operates in Simulated Development Mode:
-    formats the message, outputs to server logs, and marks whatsapp_sent=True
-    on the DetectionLog record.
+    If credentials are empty, operates in Simulated Development Mode.
 
     Returns:
         bool: True if alert was dispatched (or simulated successfully), False on error.
@@ -132,51 +180,34 @@ def send_whatsapp_alert(detection_log, admin_user=None, custom_recipients=None, 
     is_live_twilio = bool(account_sid and auth_token)
 
     if is_live_twilio:
-        try:
-            from twilio.rest import Client
-            client = Client(account_sid, auth_token)
-            sent_count = 0
+        sent_count = 0
+        last_err = None
 
-            for recipient in recipients:
-                to_addr = recipient['whatsapp_address'] if isinstance(recipient, dict) else normalize_whatsapp_number(recipient)
-                if not to_addr:
-                    continue
+        for recipient in recipients:
+            to_addr = recipient['whatsapp_address'] if isinstance(recipient, dict) else normalize_whatsapp_number(recipient)
+            if not to_addr:
+                continue
 
-                logger.info(f"Dispatching live Twilio WhatsApp alert for Detection #{detection_log.id} to {to_addr}...")
-                
-                try:
-                    # Attempt standard message body first
-                    client.messages.create(
-                        body=message_body,
-                        from_=from_whatsapp,
-                        to=to_addr
-                    )
-                except Exception as body_err:
-                    err_str = str(body_err)
-                    if "ContentSid Required" in err_str and content_sid:
-                        # Twilio Trial Sandbox requires a pre-approved template ContentSid
-                        logger.info(f"Twilio Sandbox requires ContentSid. Dispatching template {content_sid} to {to_addr}...")
-                        client.messages.create(
-                            from_=from_whatsapp,
-                            to=to_addr,
-                            content_sid=content_sid
-                        )
-                    else:
-                        raise body_err
-
+            logger.info(f"Dispatching live Twilio WhatsApp alert for Detection #{detection_log.id} to {to_addr}...")
+            ok, err = send_twilio_message(account_sid, auth_token, from_whatsapp, to_addr, message_body, content_sid)
+            if ok:
                 sent_count += 1
+            else:
+                last_err = err
+                logger.warning(f"Twilio WhatsApp dispatch failed for {to_addr}: {err}")
 
+        if sent_count > 0:
             detection_log.whatsapp_sent = True
             detection_log.whatsapp_sent_at = timezone.now()
             detection_log.save(update_fields=['whatsapp_sent', 'whatsapp_sent_at'])
             logger.info(f"SUCCESS: Twilio WhatsApp alert delivered to {sent_count} recipient(s) for Detection #{detection_log.id}.")
             return True
-
-        except Exception as twilio_err:
-            logger.error(f"FAILED: Twilio WhatsApp dispatch error for Detection #{detection_log.id}: {twilio_err}", exc_info=True)
+        else:
+            logger.error(f"FAILED: Twilio WhatsApp dispatch failed for Detection #{detection_log.id}: {last_err}")
             detection_log.whatsapp_sent = False
             detection_log.save(update_fields=['whatsapp_sent'])
             return False
+
 
     else:
         # Simulated Development Mode (No credentials required)
